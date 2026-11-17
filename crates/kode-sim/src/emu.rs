@@ -270,7 +270,11 @@ pub async fn launch(cfg: &Launch, on_line: Arc<dyn Fn(String) + Send + Sync>) ->
         // The Kode Dot's console is its USB-Serial/JTAG. A board image also
         // opens a CDC console on the USB-OTG port, which esp-emu would print
         // beside it, every line twice.
-        .args(["--console", "usb-jtag"]);
+        .args(["--console", "usb-jtag"])
+        // The P4's network is the C5's, over SDIO; its own stays shut. Left
+        // out, esp-emu on Linux opens TAP tap0 when there is one (or makes
+        // it, as root), and the P4 would be on the host's network.
+        .args(["--net", &net_arg(&[], true)]);
     if let Some(sd) = &cfg.sd {
         cmd.arg("--sd").arg(sd_arg(sd));
     }

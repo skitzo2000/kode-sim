@@ -353,6 +353,7 @@ pub(crate) fn idf(script: &Path, args: &[String], log: &Path, append: bool) -> R
     // in sight of the script sourced, which may read its own.
     const SH: &str = r#"s=$1; a=$2; shift 2; args=("$@"); set --
 . "$s" >"$a" 2>&1 || { st=$?; echo "kode-sim: ESP-IDF's environment did not activate ($s exited $st):"; cat "$a"; exit 1; }
+command -v idf.py >/dev/null || { echo "kode-sim: ESP-IDF's environment did not activate ($s left no idf.py on PATH):"; cat "$a"; exit 1; }
 idf.py "${args[@]}""#;
     let activate_log = log.with_extension("activate.log");
     let status = std::process::Command::new("bash")
@@ -1161,6 +1162,21 @@ endif()
         let text = fs::read_to_string(&log).unwrap();
         assert!(text.contains("python3 not found"), "{text}");
         assert!(text.contains(&script.display().to_string()), "{text}");
+    }
+
+    #[test]
+    fn an_environment_that_exits_0_but_brings_no_idf_py_says_why_in_the_log() {
+        // ESP-IDF's export.sh can fail and still return 0 (a missing
+        // constraints file, say): what it printed must reach the log, not
+        // only "idf.py: command not found".
+        let t = Tmp::new("idf");
+        let script = t.0.join("export.sh");
+        fs::write(&script, "echo \"constraints file doesn't exist\" >&2\nPATH=/usr/bin:/bin\n").unwrap();
+        let log = t.0.join("build.log");
+        assert!(!idf(&script, &["--version".into()], &log, false).unwrap());
+        let text = fs::read_to_string(&log).unwrap();
+        assert!(text.contains("constraints file doesn't exist"), "{text}");
+        assert!(text.contains("no idf.py on PATH"), "{text}");
     }
 
     #[test]
